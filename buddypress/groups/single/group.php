@@ -27,16 +27,23 @@
     $user = wp_get_current_user();
     $is_member = groups_is_user_member($user->ID, $group->id);
     $admins = groups_get_group_admins($group->id);   
+	$moderators = groups_get_group_mods($group->id);
     $discourse_group = mozilla_get_discourse_info($group->id);
 
-    $admin_count = sizeof($admins);
+	$admin_count = sizeof($admins);
+	$mod_count = sizeof($moderators);
     $logged_in = mozilla_is_logged_in();
 
     $args = Array(
         'group_id'      =>  $group->id,
     );
     
-    $members = groups_get_group_members($args); 
+	$members = groups_get_group_members($args); 
+	if (intval($mod_count) > 0):
+		$members_count = intval($members['count']) + intval($mod_count);
+	else: 
+		$members_count = $members['count'];
+	endif;
     $is_admin = groups_is_user_admin($user->ID, $group->id);
     $current_user = wp_get_current_user()->data;
 
@@ -167,8 +174,50 @@
                             </a>
                             <?php endforeach; ?>
                         </div>
-                        <h2 class="group__card-title"><?php print __("People", "community-portal")." ({$members['count']})"; ?></h2>
+                        <h2 class="group__card-title"><?php print __("People", "community-portal")." ({$members_count})"; ?></h2>
                         <div class="group__members">
+							<?php foreach($moderators as $moderator): 
+                                $a = get_user_by('ID', $moderator->user_id);                                
+                                $is_me = $logged_in && intval($current_user->ID) === intval($moderator->user_id);
+                                $info = mozilla_get_user_info($current_user, $a, $logged_in);
+                                
+                                if((!empty($_SERVER['HTTPS']) && $_SERVER['HTTPS'] != 'off') || $_SERVER['SERVER_PORT'] == 443) {
+                                    $avatar_url = preg_replace("/^http:/i", "https:", $info['profile_image']->value);
+                                } else {
+                                    $avatar_url = $info['profile_image']->value;
+                                }
+                    
+                            ?>
+
+                            <a href="/people/<?php print $a->user_nicename; ?>" class="members__member-card">
+                                <div class="members__avatar<?php if($info['profile_image']->display === false || $info['profile_image']->value === false): ?> members__avatar--identicon<?php endif; ?>" <?php if($info['profile_image']->display && $info['profile_image']->value): ?> style="background-image: url('<?php print $avatar_url; ?>')"<?php endif; ?> data-username="<?php print $a->user_nicename; ?>">
+
+                                </div>
+                                <div class="members__member-info">
+                                    <div class="members__username"><?php print $a->user_nicename; ?></div>
+                                    <div class="members__name">
+                                        <?php
+                                            if($info['first_name']->display && $info['first_name']->value) {
+                                                print $info['first_name']->value;
+                                            }
+
+                                            if($info['last_name']->display && $info['last_name']->value) {
+                                                print " {$info['last_name']->value}";
+                                            }
+                                        ?>
+                                    </div>
+                                    <?php if($info['location']->display && $info['location']->value): ?>
+                                    <div class="members__location">
+                                        <svg width="16" height="18" viewBox="0 0 16 18" fill="none" xmlns="http://www.w3.org/2000/svg">
+                                            <path d="M14 7.66602C14 12.3327 8 16.3327 8 16.3327C8 16.3327 2 12.3327 2 7.66602C2 6.07472 2.63214 4.54859 3.75736 3.42337C4.88258 2.29816 6.4087 1.66602 8 1.66602C9.5913 1.66602 11.1174 2.29816 12.2426 3.42337C13.3679 4.54859 14 6.07472 14 7.66602Z" stroke="#737373" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"/>
+                                            <path d="M8 9.66602C9.10457 9.66602 10 8.77059 10 7.66602C10 6.56145 9.10457 5.66602 8 5.66602C6.89543 5.66602 6 6.56145 6 7.66602C6 8.77059 6.89543 9.66602 8 9.66602Z" stroke="#737373" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"/>
+                                        </svg>&nbsp;
+                                        <?php print $info['location']->value; ?>
+                                    </div>
+                                    <?php endif; ?>
+                                </div>
+                            </a>
+                            <?php endforeach; ?>			
                             <?php foreach($members['members'] AS $member): ?>
                             <?php
                                 $is_me = $logged_in && intval($current_user->ID) === intval($member->user_id);
